@@ -1,0 +1,34 @@
+version: 0.28.0-build{build}
+build_script:
+- cmd: >-
+    set MSYSTEM=MINGW64
+
+    C:\msys64\usr\bin\bash -lc "cd \"$APPVEYOR_BUILD_FOLDER\" && exec make small && exec wc -c mastervol.exe"
+
+    move /Y mastervol.exe mastervol_x64.exe
+
+    set MSYSTEM=MINGW32
+
+    C:\msys64\usr\bin\bash -lc "cd \"$APPVEYOR_BUILD_FOLDER\" && exec make small && exec wc -c mastervol.exe"
+
+    move /Y mastervol.exe mastervol_x86.exe
+test_script:
+- cmd: >-
+    mastervol_x64.exe 67
+
+    mastervol_x64.exe -s 50
+
+    mastervol_x64.exe
+
+    mastervol_x64.exe --help
+
+    mastervol_x86.exe 73
+
+    mastervol_x86.exe -s 45
+
+    mastervol_x86.exe
+
+    mastervol_x86.exe /?
+artifacts:
+- path: mastervol_x86.exe
+- path: mastervol_x64.exe

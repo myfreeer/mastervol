@@ -1,6 +1,6 @@
 
 CFLAGS += -Wall -Wextra -Wno-unused-parameter -lole32 -Os -O3 -s \
-	-fmerge-all-constants -fno-asynchronous-unwind-tables -fmerge-all-constants \
+	-fmerge-all-constants -fno-asynchronous-unwind-tables \
 	-Wl,--gc-sections -Wl,--build-id=none
 
 CHOST = $(shell $(CC) -dumpmachine)
@@ -16,12 +16,17 @@ endif
 all: mastervol
 
 mastervol: 
-	$(CC) mastervol.c -o mastervol $(CFLAGS)
+	@echo -n Compiling and linking mastervol...
+	@$(CC) mastervol.c -o mastervol $(CFLAGS)
+	@echo Done
 
 small:
-	$(CC) mastervol.c -o mastervol $(CFLAGS) $(EXTRA_CFLAGS)
+	@echo -n Compiling and linking mastervol optimized for size...
+	@$(CC) mastervol.c -o mastervol $(CFLAGS) $(EXTRA_CFLAGS)
+	@echo Done
 
 clean:
-	rm -f mastervol.exe
+	-@rm -f mastervol.exe
 
 .PHONY: clean
+.SILENT: clean

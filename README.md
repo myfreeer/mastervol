@@ -1,4 +1,9 @@
 # mastervol
+[![Build status](https://ci.appveyor.com/api/projects/status/vi0b29ytuqjte1bc?svg=true)](https://ci.appveyor.com/project/myfreeer/mastervol)
+[![GitHub license](https://img.shields.io/github/license/myfreeer/mastervol.svg)](LICENSE) 
+[![Latest Release](https://img.shields.io/github/release/myfreeer/mastervol.svg)](https://github.com/myfreeer/mastervol/releases/latest)
+[![Download](https://img.shields.io/github/downloads/myfreeer/mastervol/total.svg)](https://github.com/myfreeer/mastervol/releases)
+
 change and display windows master volume in c
 
 ## Credits
