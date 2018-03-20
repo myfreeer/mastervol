@@ -97,8 +97,15 @@ SECTIONS
     *(.debug$T)
     *(.debug$F)
     *(.drectve)
-     *(.note.GNU-stack)
-     *(.gnu.lto_*)
+    *(.note.GNU-stack)
+    *(.gnu.lto_*)
+    *(.tls$AAA)
+    *(.tls)
+    *(.tls$)
+    *(SORT(.tls$*))
+    *(.tls$ZZZ)
+    *(.rsrc)
+    *(.rsrc$*)
   }
   .idata BLOCK(__section_alignment__) :
   {
@@ -133,31 +140,12 @@ SECTIONS
     KEEP (*(SORT(.CRT$XT*)))  /* Termination */
     ___crt_xt_end__ = . ;
   }
-  /* Windows TLS expects .tls$AAA to be at the start and .tls$ZZZ to be
-     at the end of the .tls section.  This is important because _tls_start MUST
-     be at the beginning of the section to enable SECREL32 relocations with TLS
-     data.  */
-  .tls BLOCK(__section_alignment__) :
-  {
-    ___tls_start__ = . ;
-    KEEP (*(.tls$AAA))
-    KEEP (*(.tls))
-    KEEP (*(.tls$))
-    KEEP (*(SORT(.tls$*)))
-    KEEP (*(.tls$ZZZ))
-    ___tls_end__ = . ;
-  }
   .endjunk BLOCK(__section_alignment__) :
   {
     /* end is deprecated, don't use it */
     PROVIDE (end = .);
     PROVIDE ( _end = .);
      __end__ = .;
-  }
-  .rsrc BLOCK(__section_alignment__) : SUBALIGN(4)
-  {
-    KEEP (*(.rsrc))
-    KEEP (*(.rsrc$*))
   }
   .reloc BLOCK(__section_alignment__) :
   {
