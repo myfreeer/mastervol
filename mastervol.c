@@ -7,9 +7,9 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define EXIT_ON_ERROR(hr)  \
+#define EXIT_ON_ERROR(hr, description)  \
     if (FAILED(hr)) \
-        { errorCode = -hr; printf("error %d occurred\n", errorCode); goto Exit; }
+        { errorCode = -hr; printf("%s failed: error %d occurred\n", #description, errorCode); goto Exit; }
 
 #define COM_CALL(pointer,function,...) \
     (pointer)->lpVtbl->function((pointer), ##__VA_ARGS__)
@@ -57,30 +57,11 @@ int main(int argc, char const *argv[]) {
     IMMDevice *pDevice = NULL;
     BOOL silent = FALSE;
     int errorCode = 0;
+    float currentVal, nextVal=__INT32_MAX__;
 
     if (!checkVersion(5))
         return -1;
-
-    CoInitialize(NULL);
-
-    // Get enumerator for audio endpoint devices.
-    hr = CoCreateInstance(
-        &CLSID_MMDeviceEnumerator,
-        NULL,
-        CLSCTX_ALL,
-        &IID_IMMDeviceEnumerator,
-        (void**)&pEnumerator
-    );
-    EXIT_ON_ERROR(hr)
-
-    // Get default audio-rendering device.
-    hr = COM_CALL(pEnumerator, GetDefaultAudioEndpoint, eRender, eConsole, &pDevice);
-    EXIT_ON_ERROR(hr)
-
-    hr = COM_CALL(pDevice, Activate, &IID_IAudioEndpointVolume,
-                           CLSCTX_ALL, NULL, (void**)&g_pEndptVol);
-    EXIT_ON_ERROR(hr)
-    float currentVal, nextVal=__INT32_MAX__;
+   // arguments parsing
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] == '-' || argv[i][0] == '/') {
             if (argv[i][1] == '-')
@@ -99,6 +80,27 @@ int main(int argc, char const *argv[]) {
             nextVal = atof(argv[i]);
         }
     }
+    
+    CoInitialize(NULL);
+
+    // Get enumerator for audio endpoint devices.
+    hr = CoCreateInstance(
+        &CLSID_MMDeviceEnumerator,
+        NULL,
+        CLSCTX_ALL,
+        &IID_IMMDeviceEnumerator,
+        (void**)&pEnumerator
+    );
+    EXIT_ON_ERROR(hr, CoCreateInstance)
+
+    // Get default audio-rendering device.
+    hr = COM_CALL(pEnumerator, GetDefaultAudioEndpoint, eRender, eConsole, &pDevice);
+    EXIT_ON_ERROR(hr, GetDefaultAudioEndpoint)
+
+    hr = COM_CALL(pDevice, Activate, &IID_IAudioEndpointVolume,
+                           CLSCTX_ALL, NULL, (void**)&g_pEndptVol);
+    EXIT_ON_ERROR(hr, IMMDevice Activate)
+
     if(nextVal != __INT32_MAX__) {
         nextVal = nextVal / 100.0;
        if (nextVal > 1.0) {
@@ -107,11 +109,11 @@ int main(int argc, char const *argv[]) {
            nextVal = 0.0;
        }
        hr = COM_CALL(g_pEndptVol,SetMasterVolumeLevelScalar,nextVal, NULL);
-       EXIT_ON_ERROR(hr)
+       EXIT_ON_ERROR(hr, SetMasterVolumeLevelScalar)
     }
     if (!silent) {
         hr = COM_CALL(g_pEndptVol,GetMasterVolumeLevelScalar,&currentVal);
-        EXIT_ON_ERROR(hr)
+        EXIT_ON_ERROR(hr, GetMasterVolumeLevelScalar)
         printf("%d\n", (int) round(100 * currentVal));// 0.839999 to 84 :)
     }
 
