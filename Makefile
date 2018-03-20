@@ -16,14 +16,10 @@ endif
 all: mastervol
 
 mastervol: 
-	@echo -n Compiling and linking mastervol...
-	@$(CC) mastervol.c -o mastervol $(CFLAGS)
-	@echo Done
+	$(CC) mastervol.c -o mastervol $(CFLAGS)
 
 small:
-	@echo -n Compiling and linking mastervol optimized for size...
-	@$(CC) mastervol.c -o mastervol $(CFLAGS) $(EXTRA_CFLAGS)
-	@echo Done
+	$(CC) mastervol.c -o mastervol $(CFLAGS) $(EXTRA_CFLAGS)
 
 clean:
 	-@rm -f mastervol.exe

@@ -9,7 +9,7 @@
 
 #define EXIT_ON_ERROR(hr)  \
     if (FAILED(hr)) \
-        { printf("error %ld occurred\n", -hr); goto Exit; }
+        { errorCode = -hr; printf("error %d occurred\n", errorCode); goto Exit; }
 
 #define COM_CALL(pointer,function,...) \
     (pointer)->lpVtbl->function((pointer), ##__VA_ARGS__)
@@ -56,6 +56,7 @@ int main(int argc, char const *argv[]) {
     IMMDeviceEnumerator *pEnumerator = NULL;
     IMMDevice *pDevice = NULL;
     BOOL silent = FALSE;
+    int errorCode = 0;
 
     if (!checkVersion(5))
         return -1;
@@ -120,5 +121,5 @@ int main(int argc, char const *argv[]) {
     SAFE_RELEASE(pDevice)
     SAFE_RELEASE(g_pEndptVol)
     CoUninitialize();
-    return 0;
+    return errorCode;
 }
