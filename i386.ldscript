@@ -54,7 +54,6 @@ SECTIONS
     KEEP(*(.jcr))
     __data_end__ = . ;
     *(.data_cygwin_nocopy)
-    *(.pdata*)
     *(.rdata)
 	     *(SORT(.rdata$*))
     __rt_psrelocs_start = .;
@@ -92,7 +91,8 @@ SECTIONS
     *(.tls$ZZZ)
     *(.rsrc)
     *(.rsrc$*)
-    *(.eh_frame*)
+    *(.eh_frame)
+    *(.pdata*)
   }
   .idata BLOCK(__section_alignment__) :
   {

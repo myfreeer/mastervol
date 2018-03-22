@@ -5,7 +5,8 @@ CFLAGS += -Wall -Wextra -Wno-unused-parameter -lole32 -lwinmm -O3 -Os -s \
 
 CHOST = $(shell $(CC) -dumpmachine)
 EXTRA_CFLAGS = -fno-ident -fno-stack-protector -fomit-frame-pointer \
-	-fno-unwind-tables -falign-functions=1 -falign-jumps=1 -falign-loops=1
+	-fno-unwind-tables -falign-functions=1 -falign-jumps=1 -falign-loops=1 \
+	-ffunction-sections -fdata-sections  -fno-math-errno
 
 ifneq (,$(findstring x86_64-w64-,$(CHOST)))
     EXTRA_CFLAGS += -Wl,-T,x86_64.ldscript
@@ -26,6 +27,11 @@ clean:
 
 test: small
 	./mastervol --help
+	./mastervol 50
+	./mastervol 55 -m
+	./mastervol -u
+	./mastervol -s 50
+	./mastervol
 
 .PHONY: clean
 .SILENT: clean
