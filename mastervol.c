@@ -75,7 +75,8 @@ int getMasterAudioWaveOut() {
         (int)round(100 * ((volume >> 16) + (volume & 0xffff)) / (2 * 0xffff));
     return vol;
 }
-int main(int argc, char const *argv[]) {
+
+int __cdecl mainCRTStartup() {
     IAudioEndpointVolume *g_pEndptVol = NULL;
     HRESULT hr = S_OK;
     IMMDeviceEnumerator *pEnumerator = NULL;
@@ -86,15 +87,17 @@ int main(int argc, char const *argv[]) {
     BOOL setMute = FALSE;
     BOOL showMute = FALSE;
     BOOL mute = FALSE;
+    int argc;
+    wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
 
     // arguments parsing
     for (int i = 1; i < argc; i++) {
-        int argLen = strlen(argv[i]);
+        int argLen = wcslen(argv[i]);
         if (argv[i][0] == '-' || argv[i][0] == '/') {
             for (int j = 1; j < argLen; j++) {
                 switch (argv[i][j]) {
                 case '-':
-                    if (argLen == 6 && strcmp(argv[i], "--help") == 0) {
+                    if (argLen == 6 && _wcsicmp(argv[i], L"--help") == 0) {
                         PRINT_HELP
                     }
                     break;
@@ -121,7 +124,7 @@ int main(int argc, char const *argv[]) {
                 }
             }
         } else {
-            nextVal = atof(argv[i]);
+            nextVal = _wtof(argv[i]);
         }
     }
     if (!checkVersion(5)) {
@@ -176,5 +179,7 @@ Exit:
     SAFE_RELEASE(pDevice)
     SAFE_RELEASE(g_pEndptVol)
     CoUninitialize();
+    LocalFree(argv);
+    ExitProcess(errorCode);
     return errorCode;
 }

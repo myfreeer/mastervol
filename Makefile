@@ -1,7 +1,7 @@
 CC ?= gcc
 CFLAGS += -Wall -Wextra -Wno-unused-parameter -lole32 -lwinmm -O3 -Os -s \
 	-fmerge-all-constants -fno-asynchronous-unwind-tables \
-	-Wl,--gc-sections -Wl,--build-id=none
+	-Wl,--gc-sections -Wl,--build-id=none -nostartfiles -lkernel32 -lmsvcrt
 
 CHOST = $(shell $(CC) -dumpmachine)
 EXTRA_CFLAGS = -fno-ident -fno-stack-protector -fomit-frame-pointer \
