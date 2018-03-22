@@ -24,5 +24,8 @@ small:
 clean:
 	-@rm -f mastervol.exe
 
+test: small
+	./mastervol --help
+
 .PHONY: clean
 .SILENT: clean

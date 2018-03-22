@@ -11,22 +11,26 @@
     if (FAILED(hr)) \
         { errorCode = -hr; printf("%s failed: error %d occurred\n", #description, errorCode); goto Exit; }
 
-#define COM_CALL(pointer,function,...) \
-    (pointer)->lpVtbl->function((pointer), ##__VA_ARGS__)
+#define COM_CALL(hr,pointer,function,...) \
+    (pointer)->lpVtbl->function((pointer), ##__VA_ARGS__); \
+    EXIT_ON_ERROR(hr,function)
 
 #define SAFE_RELEASE(punk)  \
     if ((punk) != NULL)  \
-        { COM_CALL((punk),Release); (punk) = NULL; }
+        { (punk)->lpVtbl->Release(punk); (punk) = NULL; }
 
 #define HELP_TEXT \
     "Change and show current master volume level\n" \
-    "%s [-s|-h] volume\n" \
-    "-s Silent mode (does not print current volume)\n" \
+    "%s [-s|-h|-d|-m|-u] volume\n" \
+    "-s Silent mode (does not print current status)\n" \
     "-h Display this help message and exit\n" \
+    "-m Mute [vista+ only]\n" \
+    "-u Unmute [vista+ only]\n" \
+    "-d Display mute status (ignored if -s) [vista+ only]\n" \
     "volume: float in 0 to 100\n" \
 
-#define PRINT_HELP(cond) \
-    if (cond) {printHelp(); goto Exit;}
+#define PRINT_HELP \
+    { printHelp(); goto Exit; }
 
 void printHelp () {
     //get self path
@@ -69,21 +73,43 @@ int main(int argc, char const *argv[]) {
     BOOL silent = FALSE;
     int errorCode = 0;
     float currentVal, nextVal=__INT32_MAX__;
+    BOOL setMute = FALSE;
+    BOOL showMute = FALSE;
+    BOOL mute = FALSE;
 
 
    // arguments parsing
     for (int i = 1; i < argc; i++) {
+        int argLen = strlen(argv[i]);
         if (argv[i][0] == '-' || argv[i][0] == '/') {
-            if (argv[i][1] == '-')
-                PRINT_HELP(strcmp(argv[i], "--help") == 0)
-            switch (argv[i][1]) {
-                case 'h':
-                case '?':
-                    PRINT_HELP(TRUE)
-                    break;
-                case 's':
-                    silent = TRUE;
-                    break;
+            for (int j = 1; j<argLen; j++) {
+                switch (argv[i][j]) {
+                    case '-':
+                        if(argLen == 6 && strcmp(argv[i], "--help") == 0) {
+                            PRINT_HELP
+                        }
+                        break;
+                    case 'h':
+                    case '?':
+                        PRINT_HELP
+                        break;
+                    case 's':
+                        silent = TRUE;
+                        break;
+                    case 'm':
+                        setMute = TRUE;
+                        mute = TRUE;
+                        showMute = TRUE;
+                        break;
+                    case 'd':
+                        showMute = TRUE;
+                        break;
+                    case 'u':
+                        setMute = TRUE;
+                        mute = FALSE;
+                        showMute = TRUE;
+                        break;
+                }
             }
         }
         else {
@@ -110,12 +136,10 @@ int main(int argc, char const *argv[]) {
     EXIT_ON_ERROR(hr, CoCreateInstance)
 
     // Get default audio-rendering device.
-    hr = COM_CALL(pEnumerator, GetDefaultAudioEndpoint, eRender, eConsole, &pDevice);
-    EXIT_ON_ERROR(hr, GetDefaultAudioEndpoint)
+    COM_CALL(hr, pEnumerator, GetDefaultAudioEndpoint, eRender, eConsole, &pDevice);
 
-    hr = COM_CALL(pDevice, Activate, &IID_IAudioEndpointVolume,
+    COM_CALL(hr, pDevice, Activate, &IID_IAudioEndpointVolume,
                            CLSCTX_ALL, NULL, (void**)&g_pEndptVol);
-    EXIT_ON_ERROR(hr, IMMDevice Activate)
 
     if (nextVal != __INT32_MAX__) {
         nextVal = nextVal / 100.0;
@@ -124,13 +148,22 @@ int main(int argc, char const *argv[]) {
        } else if (nextVal < 0.0) {
            nextVal = 0.0;
        }
-       hr = COM_CALL(g_pEndptVol,SetMasterVolumeLevelScalar,nextVal, NULL);
-       EXIT_ON_ERROR(hr, SetMasterVolumeLevelScalar)
+       COM_CALL(hr, g_pEndptVol, SetMasterVolumeLevelScalar, nextVal, NULL);
+    }
+    if (setMute) {
+        COM_CALL(hr, g_pEndptVol, SetMute, mute, NULL);
     }
     if (!silent) {
-        hr = COM_CALL(g_pEndptVol,GetMasterVolumeLevelScalar,&currentVal);
-        EXIT_ON_ERROR(hr, GetMasterVolumeLevelScalar)
+        COM_CALL(hr, g_pEndptVol, GetMasterVolumeLevelScalar, &currentVal);
         printf("%d\n", (int) round(100 * currentVal));// 0.839999 to 84 :)
+        if (showMute) {
+            COM_CALL(hr, g_pEndptVol, GetMute, &mute);
+            if(mute) {
+                printf("Muted\n");
+            } else {
+                printf("Not Muted\n");
+            }
+        }
     }
 
     Exit:
