@@ -1,5 +1,5 @@
 CC ?= gcc
-CFLAGS += -Wall -Wextra -Wno-unused-parameter -lole32 -Os -O3 -s \
+CFLAGS += -Wall -Wextra -Wno-unused-parameter -lole32 -lwinmm -O3 -Os -s \
 	-fmerge-all-constants -fno-asynchronous-unwind-tables \
 	-Wl,--gc-sections -Wl,--build-id=none
 

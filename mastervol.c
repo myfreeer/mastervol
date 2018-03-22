@@ -19,7 +19,7 @@
         { COM_CALL((punk),Release); (punk) = NULL; }
 
 #define HELP_TEXT \
-    "Change and show current master volume level [vista+]\n" \
+    "Change and show current master volume level\n" \
     "%s [-s|-h] volume\n" \
     "-s Silent mode (does not print current volume)\n" \
     "-h Display this help message and exit\n" \
@@ -50,6 +50,17 @@ BOOL checkVersion(unsigned int minVersion) {
     return TRUE;
 }
 
+MMRESULT setMasterAudioWaveOut(float vol) {
+	DWORD volume = (DWORD) round(vol * 0xffff / 100);
+	if (volume > 0xffff) volume = 0xffff;
+	return waveOutSetVolume(NULL, (volume << 16) | volume);
+}
+int getMasterAudioWaveOut() {
+	DWORD volume = 0;
+	waveOutGetVolume(NULL, &volume);
+	int vol = (int) round(100 * ((volume>>16) + (volume & 0xffff)) / (2*0xffff));
+	return vol;
+}
 int main(int argc, char const *argv[]) {
     IAudioEndpointVolume *g_pEndptVol = NULL;
     HRESULT hr = S_OK;
@@ -59,8 +70,7 @@ int main(int argc, char const *argv[]) {
     int errorCode = 0;
     float currentVal, nextVal=__INT32_MAX__;
 
-    if (!checkVersion(5))
-        return -1;
+
    // arguments parsing
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] == '-' || argv[i][0] == '/') {
@@ -80,7 +90,13 @@ int main(int argc, char const *argv[]) {
             nextVal = atof(argv[i]);
         }
     }
-    
+    if (!checkVersion(5)) {
+        if (nextVal != __INT32_MAX__)
+            setMasterAudioWaveOut(nextVal);
+        if (!silent)
+            printf("%d\n", getMasterAudioWaveOut());
+        goto Exit;
+    }
     CoInitialize(NULL);
 
     // Get enumerator for audio endpoint devices.
@@ -101,7 +117,7 @@ int main(int argc, char const *argv[]) {
                            CLSCTX_ALL, NULL, (void**)&g_pEndptVol);
     EXIT_ON_ERROR(hr, IMMDevice Activate)
 
-    if(nextVal != __INT32_MAX__) {
+    if (nextVal != __INT32_MAX__) {
         nextVal = nextVal / 100.0;
        if (nextVal > 1.0) {
            nextVal = 1.0;

@@ -66,10 +66,6 @@ SECTIONS
   __RUNTIME_PSEUDO_RELOC_LIST_END__ = .;
   ___RUNTIME_PSEUDO_RELOC_LIST__ = . - __rt_psrelocs_size;
   __RUNTIME_PSEUDO_RELOC_LIST__ = . - __rt_psrelocs_size;
-  .eh_frame BLOCK(__section_alignment__) :
-  {
-    KEEP (*(.eh_frame*))
-  }
   .bss BLOCK(__section_alignment__) :
   {
     __bss_start__ = . ;
@@ -97,6 +93,7 @@ SECTIONS
     *(.rsrc)
     *(.rsrc$*)
     *(.xdata*)
+    *(.eh_frame*)
   }
   .idata BLOCK(__section_alignment__) :
   {
