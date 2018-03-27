@@ -1,7 +1,7 @@
 CC ?= gcc
-CFLAGS += -Wall -Wextra -Wno-unused-parameter -lole32 -lwinmm -O3 -Os -s \
+CFLAGS += -Wall -Wextra -lole32 -lwinmm -O3 -Os -s -nostartfiles \
 	-fmerge-all-constants -fno-asynchronous-unwind-tables \
-	-Wl,--gc-sections -Wl,--build-id=none -nostartfiles -lkernel32 -lmsvcrt
+	-Wl,--gc-sections -Wl,--build-id=none
 
 CHOST = $(shell $(CC) -dumpmachine)
 EXTRA_CFLAGS = -fno-ident -fno-stack-protector -fomit-frame-pointer \
@@ -23,7 +23,7 @@ small:
 	$(CC) mastervol.c -o mastervol $(CFLAGS) $(EXTRA_CFLAGS)
 
 clean:
-	-@rm -f mastervol.exe
+	-@rm -f *.exe *.o
 
 test: small
 	./mastervol --help
@@ -32,6 +32,9 @@ test: small
 	./mastervol -u
 	./mastervol -s 50
 	./mastervol
+
+%.exe: %.c
+	$(CC) $< -o $@ $(CFLAGS) $(EXTRA_CFLAGS)
 
 .PHONY: clean
 .SILENT: clean

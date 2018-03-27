@@ -14,6 +14,12 @@
         goto Exit;                                                             \
     }
 
+#define EXIT_ON_MM_ERROR(mmResult, description)                                \
+    if (MMSYSERR_NOERROR != mmResult) {                                        \
+        printf("%s failed: error %d occurred\n", #description, mmResult);      \
+        goto ExitXP;                                                           \
+    }
+
 #define COM_CALL(hr, pointer, function, ...)                                   \
     hr = (pointer)->lpVtbl->function((pointer), ##__VA_ARGS__);                \
     EXIT_ON_ERROR(hr, function)
@@ -29,9 +35,9 @@
     "%s [-s|-h|-d|-m|-u] volume\n"                                             \
     "-s Silent mode (does not print current status)\n"                         \
     "-h Display this help message and exit\n"                                  \
-    "-m Mute [vista+ only]\n"                                                  \
-    "-u Unmute [vista+ only]\n"                                                \
-    "-d Display mute status (ignored if -s) [vista+ only]\n"                   \
+    "-m Mute\n"                                                                \
+    "-u Unmute\n"                                                              \
+    "-d Display mute status (ignored if -s)\n"                                 \
     "volume: float in 0 to 100\n"
 
 #define PRINT_HELP                                                             \
@@ -63,7 +69,7 @@ BOOL checkVersion(unsigned int minVersion) {
 }
 
 MMRESULT setMasterAudioWaveOut(float vol) {
-    DWORD volume = (DWORD)round(vol * 0xffff / 100);
+    DWORD volume = (DWORD)round(vol * 0xffff);
     if (volume > 0xffff)
         volume = 0xffff;
     return waveOutSetVolume(NULL, (volume << 16) | volume);
@@ -87,6 +93,7 @@ int __cdecl mainCRTStartup() {
     BOOL setMute = FALSE;
     BOOL showMute = FALSE;
     BOOL mute = FALSE;
+    BOOL waveOut = FALSE;
     int argc;
     wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
 
@@ -127,11 +134,129 @@ int __cdecl mainCRTStartup() {
             nextVal = _wtof(argv[i]);
         }
     }
+    if (nextVal != __INT32_MAX__) {
+        nextVal = nextVal / 100.0;
+        if (nextVal > 1.0) {
+            nextVal = 1.0;
+        } else if (nextVal < 0.0) {
+            nextVal = 0.0;
+        }
+    }
     if (!checkVersion(5)) {
-        if (nextVal != __INT32_MAX__)
-            setMasterAudioWaveOut(nextVal);
-        if (!silent)
-            printf("%d\n", getMasterAudioWaveOut());
+        MMRESULT mmResult = MMSYSERR_NOERROR;
+        HMIXER hMixer;
+        MIXERCONTROL mixerControl;
+        MIXERLINE mixerLine;
+        MIXERLINECONTROLS mixerLineControlsVol;
+        MIXERLINECONTROLS mixerLineControlsMute;
+        MIXERCONTROLDETAILS mixerControlDetailsVol;
+        MIXERCONTROLDETAILS mixerControlDetailsMute;
+        MIXERCONTROLDETAILS_UNSIGNED volStruct;
+        MIXERCONTROLDETAILS_BOOLEAN muteStruct;
+
+        // open default mixer
+        mmResult = mixerOpen(&hMixer, 0, 0, 0, 0);
+        EXIT_ON_MM_ERROR(mmResult, mixerOpen)
+
+        // get mixer line info
+        ZeroMemory(&mixerLine, sizeof(mixerLine));
+        mixerLine.cbStruct = sizeof(mixerLine);
+        // speakers
+        mixerLine.dwComponentType = MIXERLINE_COMPONENTTYPE_DST_SPEAKERS;
+        mmResult = mixerGetLineInfo((HMIXEROBJ)hMixer, &mixerLine,
+                                    MIXER_GETLINEINFOF_COMPONENTTYPE);
+        EXIT_ON_MM_ERROR(mmResult, mixerGetLineInfo)
+
+        // Mixer Line Controls Volume
+        ZeroMemory(&mixerLineControlsVol, sizeof(mixerLineControlsVol));
+        mixerLineControlsVol.cbStruct = sizeof(mixerLineControlsVol);
+        mixerLineControlsVol.dwLineID = mixerLine.dwLineID;
+        mixerLineControlsVol.dwControlType = MIXERCONTROL_CONTROLTYPE_VOLUME;
+        mixerLineControlsVol.cControls = 1;
+        mixerLineControlsVol.cbmxctrl = sizeof(mixerControl);
+        mixerLineControlsVol.pamxctrl = &mixerControl;
+        ZeroMemory(&mixerControl, sizeof(mixerControl));
+        mixerControl.cbStruct = sizeof(mixerControl);
+        mmResult =
+            mixerGetLineControls((HMIXEROBJ)hMixer, &mixerLineControlsVol,
+                                 MIXER_GETLINECONTROLSF_ONEBYTYPE);
+        EXIT_ON_MM_ERROR(mmResult, mixerGetLineControls)
+
+        // volume mixer control details
+        ZeroMemory(&mixerControlDetailsVol, sizeof(mixerControlDetailsVol));
+        mixerControlDetailsVol.cbStruct = sizeof(mixerControlDetailsVol);
+        mixerControlDetailsVol.cbDetails = sizeof(volStruct);
+        mixerControlDetailsVol.dwControlID = mixerControl.dwControlID;
+        mixerControlDetailsVol.paDetails = &volStruct;
+        mixerControlDetailsVol.cChannels = 1;
+
+        const DWORD maxVol = mixerControl.Bounds.lMaximum;
+        const DWORD minVol = mixerControl.Bounds.lMinimum;
+        if (nextVal != __INT32_MAX__) {
+            volStruct.dwValue = ((maxVol - minVol) * nextVal) + minVol;
+            mmResult = mixerSetControlDetails((HMIXEROBJ)hMixer,
+                                              &mixerControlDetailsVol,
+                                              MIXER_SETCONTROLDETAILSF_VALUE);
+            EXIT_ON_MM_ERROR(mmResult, mixerSetControlDetails)
+        }
+        if (setMute || showMute) {
+            // Mixer Line Controls Mute
+            ZeroMemory(&mixerLineControlsMute, sizeof(mixerLineControlsMute));
+            mixerLineControlsMute.cbStruct = sizeof(mixerLineControlsMute);
+            mixerLineControlsMute.dwLineID = mixerLine.dwLineID;
+            mixerLineControlsMute.dwControlType = MIXERCONTROL_CONTROLTYPE_MUTE;
+            mixerLineControlsMute.cControls = 1;
+            mixerLineControlsMute.cbmxctrl = sizeof(mixerControl);
+            mixerLineControlsMute.pamxctrl = &mixerControl;
+            ZeroMemory(&mixerControl, sizeof(mixerControl));
+            mixerControl.cbStruct = sizeof(mixerControl);
+            mmResult =
+                mixerGetLineControls((HMIXEROBJ)hMixer, &mixerLineControlsMute,
+                                     MIXER_GETLINECONTROLSF_ONEBYTYPE);
+            EXIT_ON_MM_ERROR(mmResult, mixerGetLineControls)
+
+            // mute mixer control details
+            ZeroMemory(&mixerControlDetailsMute,
+                       sizeof(mixerControlDetailsMute));
+            mixerControlDetailsMute.cbStruct = sizeof(mixerControlDetailsMute);
+            mixerControlDetailsMute.cbDetails = sizeof(muteStruct);
+            mixerControlDetailsMute.dwControlID = mixerControl.dwControlID;
+            mixerControlDetailsMute.paDetails = &muteStruct;
+            mixerControlDetailsMute.cChannels = 1;
+        }
+        if (setMute) {
+            // change mute status
+            muteStruct.fValue = mute;
+            mmResult = mixerSetControlDetails((HMIXEROBJ)hMixer,
+                                              &mixerControlDetailsMute,
+                                              MIXER_SETCONTROLDETAILSF_VALUE);
+            EXIT_ON_MM_ERROR(mmResult, mixerSetControlDetails)
+        }
+        if (!silent) {
+            // get master volume
+            mmResult = mixerGetControlDetails((HMIXEROBJ)hMixer,
+                                              &mixerControlDetailsVol,
+                                              MIXER_GETCONTROLDETAILSF_VALUE);
+            EXIT_ON_MM_ERROR(mmResult, mixerGetControlDetails)
+            printf("%d\n",
+                   (int)round(100 * ((double)volStruct.dwValue + minVol) /
+                              (maxVol - minVol)));
+            if (showMute) {
+                // get mute status
+                mmResult = mixerGetControlDetails(
+                    (HMIXEROBJ)hMixer, &mixerControlDetailsMute,
+                    MIXER_GETCONTROLDETAILSF_VALUE);
+                EXIT_ON_MM_ERROR(mmResult, mixerGetControlDetails)
+                mute = muteStruct.fValue;
+                if (mute) {
+                    printf("Muted\n");
+                } else {
+                    printf("Not Muted\n");
+                }
+            }
+        }
+    ExitXP:
+        mixerClose(hMixer);
         goto Exit;
     }
     CoInitialize(NULL);
@@ -149,12 +274,6 @@ int __cdecl mainCRTStartup() {
              (void **)&g_pEndptVol);
 
     if (nextVal != __INT32_MAX__) {
-        nextVal = nextVal / 100.0;
-        if (nextVal > 1.0) {
-            nextVal = 1.0;
-        } else if (nextVal < 0.0) {
-            nextVal = 0.0;
-        }
         COM_CALL(hr, g_pEndptVol, SetMasterVolumeLevelScalar, nextVal, NULL);
     }
     if (setMute) {
