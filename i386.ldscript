@@ -91,7 +91,7 @@ SECTIONS
     *(.tls$ZZZ)
     *(.rsrc)
     *(.rsrc$*)
-    *(.eh_frame)
+    *(.eh_frame*)
     *(.pdata*)
   }
   .idata BLOCK(__section_alignment__) :
