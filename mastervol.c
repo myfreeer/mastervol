@@ -274,6 +274,9 @@ int __cdecl mainCRTStartup() {
                 case 'd':
                     showMute = TRUE;
                     break;
+                case 'w':
+                    waveOut = TRUE;
+                    break;
                 case 'u':
                     setMute = TRUE;
                     mute = FALSE;
