@@ -7,6 +7,13 @@
 #include <stdlib.h>
 #include <math.h>
 
+#define MASTERVOL_SILENT (1)
+#define MASTERVOL_SET_VOL (1<<1)
+#define MASTERVOL_SET_MUTE (1<<2)
+#define MASTERVOL_SHOW_MUTE (1<<3)
+#define MASTERVOL_MUTE (1<<4)
+#define MASTERVOL_WAVEOUT (1<<5)
+
 #define EXIT_ON_ERROR(hr, description)                                         \
     if (FAILED(hr)) {                                                          \
         errorCode = -hr;                                                       \
@@ -88,9 +95,9 @@ BOOL checkVersion(unsigned int minVersion) {
     return TRUE;
 }
 
-int masterVolumeEndpoint(BOOL setVolume, float volume, BOOL silent,
-                         BOOL setMute, BOOL showMute, BOOL mute) {
+int masterVolumeEndpoint(unsigned int flags, float volume) {
     int errorCode = 0;
+    BOOL mute = flags & MASTERVOL_MUTE;
     IAudioEndpointVolume *g_pEndptVol = NULL;
     HRESULT hResult = S_OK;
     IMMDeviceEnumerator *pEnumerator = NULL;
@@ -110,19 +117,19 @@ int masterVolumeEndpoint(BOOL setVolume, float volume, BOOL silent,
     COM_CALL(hResult, pDevice, Activate, &IID_IAudioEndpointVolume, CLSCTX_ALL,
              NULL, (void **)&g_pEndptVol);
 
-    if (setVolume) {
+    if (flags & MASTERVOL_SET_VOL) {
         COM_CALL(hResult, g_pEndptVol, SetMasterVolumeLevelScalar, volume,
                  NULL);
     }
-    if (setMute) {
+    if (flags & MASTERVOL_SET_MUTE) {
         COM_CALL(hResult, g_pEndptVol, SetMute, mute, NULL);
     }
-    if (!silent) {
+    if (!(flags & MASTERVOL_SILENT)) {
         float currentVolume;
         COM_CALL(hResult, g_pEndptVol, GetMasterVolumeLevelScalar,
                  &currentVolume);
         printf("%d\n", (int)round(100 * currentVolume));
-        if (showMute) {
+        if (flags & MASTERVOL_SHOW_MUTE) {
             COM_CALL(hResult, g_pEndptVol, GetMute, &mute);
             printf(mute ? "Muted\n" : "Not Muted\n");
         }
@@ -136,9 +143,9 @@ ExitEndpoint:
     return errorCode;
 }
 
-int masterVolumeMixerControl(BOOL setVolume, float volume, BOOL silent,
-                             BOOL setMute, BOOL showMute, BOOL mute) {
+int masterVolumeMixerControl(unsigned int flags, float volume) {
     int errorCode = 0;
+    BOOL mute = flags & MASTERVOL_MUTE;
     MMRESULT mmResult = MMSYSERR_NOERROR;
     HMIXER hMixer;
     MIXERCONTROL mixerControl;
@@ -173,7 +180,7 @@ int masterVolumeMixerControl(BOOL setVolume, float volume, BOOL silent,
 
     const DWORD maxVol = mixerControl.Bounds.lMaximum;
     const DWORD minVol = mixerControl.Bounds.lMinimum;
-    if (setVolume) {
+    if (flags & MASTERVOL_SET_VOL) {
         volStruct.dwValue = ((maxVol - minVol) * volume) + minVol;
         mmResult =
             mixerSetControlDetails((HMIXEROBJ)hMixer, &mixerControlDetails,
@@ -186,7 +193,7 @@ int masterVolumeMixerControl(BOOL setVolume, float volume, BOOL silent,
     EXIT_ON_MM_ERROR(mmResult, mixerGetControlDetails)
     int currentVolume = (int)round(100 * ((double)volStruct.dwValue + minVol) /
                                    (maxVol - minVol));
-    if (setMute || showMute) {
+    if (flags & (MASTERVOL_SET_MUTE | MASTERVOL_SHOW_MUTE)) {
         // Mixer Line Controls Mute
         mixerLineControls.dwControlType = MIXERCONTROL_CONTROLTYPE_MUTE;
         mmResult = mixerGetLineControls((HMIXEROBJ)hMixer, &mixerLineControls,
@@ -196,7 +203,7 @@ int masterVolumeMixerControl(BOOL setVolume, float volume, BOOL silent,
         // mute mixer control details
         MIXER_DT_INIT(mixerControlDetails, mixerControl, muteStruct)
     }
-    if (setMute) {
+    if (flags & MASTERVOL_SET_MUTE) {
         // change mute status
         muteStruct.fValue = mute;
         mmResult =
@@ -204,9 +211,9 @@ int masterVolumeMixerControl(BOOL setVolume, float volume, BOOL silent,
                                    MIXER_SETCONTROLDETAILSF_VALUE);
         EXIT_ON_MM_ERROR(mmResult, mixerSetControlDetails)
     }
-    if (!silent) {
+    if (!(flags & MASTERVOL_SILENT)) {
         printf("%d\n", currentVolume);
-        if (showMute) {
+        if (flags & MASTERVOL_SHOW_MUTE) {
             // get mute status
             mmResult =
                 mixerGetControlDetails((HMIXEROBJ)hMixer, &mixerControlDetails,
@@ -237,14 +244,9 @@ int getVolumeWaveOut() {
 }
 
 int __cdecl mainCRTStartup() {
-    BOOL silent = FALSE;
     int errorCode = 0;
-    BOOL setVolume = FALSE;
     float volume = 0;
-    BOOL setMute = FALSE;
-    BOOL showMute = FALSE;
-    BOOL mute = FALSE;
-    BOOL waveOut = FALSE;
+    unsigned int flags = 0;
     int argc;
     wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
 
@@ -264,32 +266,32 @@ int __cdecl mainCRTStartup() {
                     PRINT_HELP
                     break;
                 case 's':
-                    silent = TRUE;
+                    flags |= MASTERVOL_SILENT;
                     break;
                 case 'm':
-                    setMute = TRUE;
-                    mute = TRUE;
-                    showMute = TRUE;
+                    flags |= MASTERVOL_SET_MUTE;
+                    flags |= MASTERVOL_MUTE;
+                    flags |= MASTERVOL_SHOW_MUTE;
                     break;
                 case 'd':
-                    showMute = TRUE;
+                    flags |= MASTERVOL_SHOW_MUTE;
                     break;
                 case 'w':
-                    waveOut = TRUE;
+                    flags |= MASTERVOL_WAVEOUT;
                     break;
                 case 'u':
-                    setMute = TRUE;
-                    mute = FALSE;
-                    showMute = TRUE;
+                    flags |= MASTERVOL_SET_MUTE;
+                    flags &= ~MASTERVOL_MUTE;
+                    flags |= MASTERVOL_SHOW_MUTE;
                     break;
                 }
             }
         } else {
             volume = _wtof(argv[i]);
-            setVolume = TRUE;
+            flags |= MASTERVOL_SET_VOL;
         }
     }
-    if (setVolume) {
+    if (flags & MASTERVOL_SET_VOL) {
         volume = volume / 100.0;
         if (volume > 1.0) {
             volume = 1.0;
@@ -298,22 +300,20 @@ int __cdecl mainCRTStartup() {
         }
     }
     if (!checkVersion(5)) {
-        if (waveOut) {
-            if (setVolume) {
+        if (flags & MASTERVOL_WAVEOUT) {
+            if (flags & MASTERVOL_SET_VOL) {
                 setVolumeWaveOut(volume);
             }
-            if (!silent) {
+            if (!(flags & MASTERVOL_SILENT)) {
                 printf("Wave Out Vol: %d\n", getVolumeWaveOut());
             }
-            errorCode = masterVolumeMixerControl(FALSE, volume, silent, setMute,
-                                                 showMute, mute);
+            flags &= ~MASTERVOL_SET_VOL;
+            errorCode = masterVolumeMixerControl(flags, volume);
         } else {
-            errorCode = masterVolumeMixerControl(setVolume, volume, silent,
-                                                 setMute, showMute, mute);
+            errorCode = masterVolumeMixerControl(flags, volume);
         }
     } else {
-        errorCode = masterVolumeEndpoint(setVolume, volume, silent, setMute,
-                                         showMute, mute);
+        errorCode = masterVolumeEndpoint(flags, volume);
     }
 
 Exit:
