@@ -221,7 +221,7 @@ ExitMixer:
 }
 
 MMRESULT setVolumeWaveOut(float vol) {
-    DWORD volume = (DWORD)round(vol * 0xffff);
+    DWORD volume = (DWORD)lroundf(vol * 0xffff);
     if (volume > 0xffff)
         volume = 0xffff;
     return waveOutSetVolume(NULL, (volume << 16) | volume);
@@ -231,7 +231,7 @@ int getVolumeWaveOut() {
     DWORD volume = 0;
     waveOutGetVolume(NULL, &volume);
     int vol =
-        (int)round(100 * ((volume >> 16) + (volume & 0xffff)) / (2 * 0xffff));
+        (int)lroundf(100 * ((volume >> 16) + (volume & 0xffff)) / (2 * 0xffff));
     return vol;
 }
 
@@ -245,9 +245,9 @@ int __cdecl mainCRTStartup() {
 
     // arguments parsing
     for (int i = 1; i < argc; i++) {
-        int argLen = wcslen(argv[i]);
+        size_t argLen = wcslen(argv[i]);
         if (argv[i][0] == '-' || argv[i][0] == '/') {
-            for (int j = 1; j < argLen; j++) {
+            for (size_t j = 1; j < argLen; j++) {
                 switch (argv[i][j]) {
                 case '-':
                     if (argLen == 6 && _wcsicmp(argv[i], L"--help") == 0) {
@@ -312,7 +312,7 @@ int __cdecl mainCRTStartup() {
         errorCode = masterVolEndpoint(flags, &volume, &mute);
     }
     if (!(flags & MASTERVOL_SILENT)) {
-        printf("%d\n", (int) round(volume * 100));
+        printf("%d\n", (int) lroundf(volume * 100));
         if (flags & MASTERVOL_GET_MUTE) {
             printf(mute ? "Muted\n" : "Not Muted\n");
         }
