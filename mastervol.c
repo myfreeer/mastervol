@@ -172,10 +172,31 @@ int masterVolMixer(unsigned int flags, float *volume, BOOL *mute) {
 
     // get mixer line info
     MIXER_INIT(mixerLine)
-    // speakers
-    mixerLine.dwComponentType = MIXERLINE_COMPONENTTYPE_DST_SPEAKERS;
+    // dwComponentType
+    DWORD dwComponentType = MIXERLINE_COMPONENTTYPE_DST_SPEAKERS;
+    if (flags & MASTERVOL_IN) {
+        dwComponentType = MIXERLINE_COMPONENTTYPE_SRC_MICROPHONE;
+    } else if (flags & MASTERVOL_WAVEOUT) {
+        dwComponentType = MIXERLINE_COMPONENTTYPE_SRC_WAVEOUT;
+    } else if (flags & MASTERVOL_LINE) {
+        dwComponentType = MIXERLINE_COMPONENTTYPE_SRC_LINE;
+    } else if (flags & MASTERVOL_MIDI) {
+        dwComponentType = MIXERLINE_COMPONENTTYPE_SRC_SYNTHESIZER;
+    } else if (flags & MASTERVOL_CD) {
+        dwComponentType = MIXERLINE_COMPONENTTYPE_SRC_COMPACTDISC;
+    }
+
+    mixerLine.dwComponentType = dwComponentType;
     mmResult = mixerGetLineInfo((HMIXEROBJ)hMixer, &mixerLine,
                                 MIXER_GETLINEINFOF_COMPONENTTYPE);
+
+    // workaround
+    if (mmResult == MIXERR_INVALCONTROL &&
+        dwComponentType == MIXERLINE_COMPONENTTYPE_DST_WAVEIN) {
+        mixerLine.dwComponentType = dwComponentType;
+        mmResult = mixerGetLineInfo((HMIXEROBJ)hMixer, &mixerLine,
+                                    MIXER_GETLINEINFOF_COMPONENTTYPE);
+    }
     EXIT_ON_MM_ERROR(mmResult, mixerGetLineInfo)
 
     // Mixer Line Controls
@@ -183,20 +204,6 @@ int masterVolMixer(unsigned int flags, float *volume, BOOL *mute) {
     MIXER_LI_INIT(mixerLineControls, mixerControl, mixerLine)
 
     mixerLineControls.dwControlType = MIXERCONTROL_CONTROLTYPE_VOLUME;
-    if (flags & MASTERVOL_IN)
-        mixerLineControls.dwControlType =
-            MIXERLINE_COMPONENTTYPE_SRC_MICROPHONE;
-    else if (flags & MASTERVOL_WAVEOUT)
-        mixerLineControls.dwControlType = MIXERLINE_COMPONENTTYPE_SRC_WAVEOUT;
-    else if (flags & MASTERVOL_LINE)
-        mixerLineControls.dwControlType = MIXERLINE_COMPONENTTYPE_SRC_LINE;
-    else if (flags & MASTERVOL_MIDI)
-        mixerLineControls.dwControlType =
-            MIXERLINE_COMPONENTTYPE_SRC_SYNTHESIZER;
-    else if (flags & MASTERVOL_CD)
-        mixerLineControls.dwControlType =
-            MIXERLINE_COMPONENTTYPE_SRC_COMPACTDISC;
-
     mmResult = mixerGetLineControls((HMIXEROBJ)hMixer, &mixerLineControls,
                                     MIXER_GETLINECONTROLSF_ONEBYTYPE);
     EXIT_ON_MM_ERROR(mmResult, mixerGetLineControls)
