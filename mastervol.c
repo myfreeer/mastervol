@@ -13,7 +13,13 @@
 #define MASTERVOL_GET_VOL FLAG(2)
 #define MASTERVOL_SET_MUTE FLAG(3)
 #define MASTERVOL_GET_MUTE FLAG(4)
-#define MASTERVOL_WAVEOUT FLAG(5)
+#define MASTERVOL_IN FLAG(5)
+#define MASTERVOL_WAVEOUT FLAG(6)
+#define MASTERVOL_CD FLAG(7)
+#define MASTERVOL_MIDI FLAG(8)
+#define MASTERVOL_LINE FLAG(9)
+#define MASTERVOL_SWITCHES MASTERVOL_IN | MASTERVOL_WAVEOUT |                  \
+    MASTERVOL_CD | MASTERVOL_MIDI | MASTERVOL_LINE
 
 #define EXIT_ON_ERROR(hr, description)                                         \
     if (FAILED(hr)) {                                                          \
@@ -65,7 +71,11 @@
     "-m Mute\n"                                                                \
     "-u Unmute\n"                                                              \
     "-d Display mute status (ignored if -s)\n"                                 \
-    "-w Use wave out api on win xp\n"                                          \
+    "-i Set/get default audio input device status\n"                           \
+    "-w Set/get Wave Out status (win xp)\n"                                    \
+    "-c Set/get CD status (win xp)\n"                                          \
+    "-n Set/get Midi status (win xp)\n"                                        \
+    "-l Set/get Line in status (win xp)\n"                                     \
     "volume: float in 0 to 100\n"
 
 #define PRINT_HELP                                                             \
@@ -110,8 +120,12 @@ int masterVolEndpoint(unsigned int flags, float *volume, BOOL *mute) {
                                &IID_IMMDeviceEnumerator, (void **)&pEnumerator);
     EXIT_ON_ERROR(hResult, CoCreateInstance)
 
+    EDataFlow eDataFlow = eRender;
+    if (flags & MASTERVOL_IN) {
+        eDataFlow = eCapture;
+    }
     // Get default audio-rendering device.
-    COM_CALL(hResult, pEnumerator, GetDefaultAudioEndpoint, eRender, eConsole,
+    COM_CALL(hResult, pEnumerator, GetDefaultAudioEndpoint, eDataFlow, eConsole,
              &pDevice);
 
     COM_CALL(hResult, pDevice, Activate, &IID_IAudioEndpointVolume, CLSCTX_ALL,
@@ -162,10 +176,25 @@ int masterVolMixer(unsigned int flags, float *volume, BOOL *mute) {
                                 MIXER_GETLINEINFOF_COMPONENTTYPE);
     EXIT_ON_MM_ERROR(mmResult, mixerGetLineInfo)
 
-    // Mixer Line Controls Volume
+    // Mixer Line Controls
     MIXER_INIT(mixerControl)
     MIXER_LI_INIT(mixerLineControls, mixerControl, mixerLine)
+
     mixerLineControls.dwControlType = MIXERCONTROL_CONTROLTYPE_VOLUME;
+    if (flags & MASTERVOL_IN)
+        mixerLineControls.dwControlType =
+            MIXERLINE_COMPONENTTYPE_SRC_MICROPHONE;
+    else if (flags & MASTERVOL_WAVEOUT)
+        mixerLineControls.dwControlType = MIXERLINE_COMPONENTTYPE_SRC_WAVEOUT;
+    else if (flags & MASTERVOL_LINE)
+        mixerLineControls.dwControlType = MIXERLINE_COMPONENTTYPE_SRC_LINE;
+    else if (flags & MASTERVOL_MIDI)
+        mixerLineControls.dwControlType =
+            MIXERLINE_COMPONENTTYPE_SRC_SYNTHESIZER;
+    else if (flags & MASTERVOL_CD)
+        mixerLineControls.dwControlType =
+            MIXERLINE_COMPONENTTYPE_SRC_COMPACTDISC;
+
     mmResult = mixerGetLineControls((HMIXEROBJ)hMixer, &mixerLineControls,
                                     MIXER_GETLINECONTROLSF_ONEBYTYPE);
     EXIT_ON_MM_ERROR(mmResult, mixerGetLineControls)
@@ -220,21 +249,6 @@ ExitMixer:
     return errorCode;
 }
 
-MMRESULT setVolumeWaveOut(float vol) {
-    DWORD volume = (DWORD)lroundf(vol * 0xffff);
-    if (volume > 0xffff)
-        volume = 0xffff;
-    return waveOutSetVolume(NULL, (volume << 16) | volume);
-}
-
-int getVolumeWaveOut() {
-    DWORD volume = 0;
-    waveOutGetVolume(NULL, &volume);
-    int vol =
-        (int)lroundf(100 * ((volume >> 16) + (volume & 0xffff)) / (2 * 0xffff));
-    return vol;
-}
-
 int __cdecl mainCRTStartup() {
     int errorCode = 0;
     float volume = 0;
@@ -269,13 +283,30 @@ int __cdecl mainCRTStartup() {
                 case 'd':
                     flags |= MASTERVOL_GET_MUTE;
                     break;
-                case 'w':
-                    flags |= MASTERVOL_WAVEOUT;
-                    break;
                 case 'u':
                     mute = FALSE;
                     flags |= MASTERVOL_SET_MUTE;
                     flags |= MASTERVOL_GET_MUTE;
+                    break;
+                case 'i':
+                    flags &= ~MASTERVOL_SWITCHES;
+                    flags |= MASTERVOL_IN;
+                    break;
+                case 'w':
+                    flags &= ~MASTERVOL_SWITCHES;
+                    flags |= MASTERVOL_WAVEOUT;
+                    break;
+                case 'c':
+                    flags &= ~MASTERVOL_SWITCHES;
+                    flags |= MASTERVOL_CD;
+                    break;
+                case 'n':
+                    flags &= ~MASTERVOL_SWITCHES;
+                    flags |= MASTERVOL_MIDI;
+                    break;
+                case 'l':
+                    flags &= ~MASTERVOL_SWITCHES;
+                    flags |= MASTERVOL_LINE;
                     break;
                 }
             }
@@ -297,13 +328,6 @@ int __cdecl mainCRTStartup() {
     }
     if (!checkVersion(5)) {
         if (flags & MASTERVOL_WAVEOUT) {
-            if (flags & MASTERVOL_SET_VOL) {
-                setVolumeWaveOut(volume);
-            }
-            if (!(flags & MASTERVOL_SILENT)) {
-                printf("Wave Out Vol: %d\n", getVolumeWaveOut());
-            }
-            flags &= ~MASTERVOL_SET_VOL;
             errorCode = masterVolMixer(flags, &volume, &mute);
         } else {
             errorCode = masterVolMixer(flags, &volume, &mute);
