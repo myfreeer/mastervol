@@ -274,6 +274,8 @@ int __cdecl mainCRTStartup() {
     // arguments parsing
     for (int i = 1; i < argc; i++) {
         size_t argLen = wcslen(argv[i]);
+        if (argLen < 1)
+            continue;
         if (argv[i][0] == '-' || argv[i][0] == '/') {
             for (size_t j = 1; j < argLen; j++) {
                 switch (argv[i][j]) {
@@ -323,7 +325,7 @@ int __cdecl mainCRTStartup() {
                     break;
                 }
             }
-        } else {
+        } else if ((argv[i][0] >= '0' && argv[i][0] <= '9') || argv[i][0] == '.') {
             volume = _wtof(argv[i]);
             flags |= MASTERVOL_SET_VOL;
         }
