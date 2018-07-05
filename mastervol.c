@@ -21,13 +21,6 @@
 #define MASTERVOL_SWITCHES MASTERVOL_IN | MASTERVOL_WAVEOUT |                  \
     MASTERVOL_CD | MASTERVOL_MIDI | MASTERVOL_LINE
 
-#define EXIT_ON_ERROR(hr, description)                                         \
-    if (FAILED(hr)) {                                                          \
-        errorCode = -(hr);                                                     \
-        printf("%s failed: error %d occurred\n", #description, errorCode);     \
-        goto ExitEndpoint;                                                     \
-    }
-
 #define EXIT_ON_MM_ERROR(mmResult, description)                                \
     if (MMSYSERR_NOERROR != (mmResult)) {                                      \
         errorCode = (mmResult);                                                \
@@ -57,6 +50,13 @@
     hr = (pointer)->lpVtbl->function((pointer), ##__VA_ARGS__);                \
     EXIT_ON_ERROR(hr, function)
 
+#define EXIT_ON_ERROR(hr, description)                                         \
+    if (FAILED(hr)) {                                                          \
+        errorCode = -(hr);                                                     \
+        printf("%s failed: error %d occurred\n", #description, errorCode);     \
+        goto ExitEndpoint;                                                     \
+    }
+
 #define SAFE_RELEASE(punk)                                                     \
     if ((punk) != NULL) {                                                      \
         (punk)->lpVtbl->Release(punk);                                         \
@@ -71,20 +71,22 @@
     "-m Mute\n"                                                                \
     "-u Unmute\n"                                                              \
     "-d Display mute status (ignored if -s)\n"                                 \
-    "-i Set/get default audio input device status\n"                           \
+    "-i Set/get default audio input device status\n"
+
+#define HELP_TEXT_XP                                                           \
     "-w Set/get Wave Out status (win xp)\n"                                    \
     "-c Set/get CD status (win xp)\n"                                          \
     "-n Set/get Midi status (win xp)\n"                                        \
     "-l Set/get Line in status (win xp)\n"                                     \
     "volume: float in 0 to 100\n"
 
-#define PRINT_HELP                                                             \
+#define PRINT_HELP(version)                                                    \
     {                                                                          \
-        printHelp();                                                           \
+        printHelp(version);                                                    \
         goto Exit;                                                             \
     }
 
-void printHelp() {
+void printHelp(ULONG version) {
     // get self path
     char selfName[MAX_PATH];
     GetModuleFileName(NULL, selfName, MAX_PATH);
@@ -95,15 +97,16 @@ void printHelp() {
         strcpy(selfName, ptr + 1);
 
     printf(HELP_TEXT, selfName);
+    if (version < 6) {
+        puts(HELP_TEXT_XP);
+    }
 }
-BOOL checkVersion(unsigned int minVersion) {
+ULONG getMajorVersion(void) {
     OSVERSIONINFO VersionInfo;
     ZeroMemory(&VersionInfo, sizeof(OSVERSIONINFO));
     VersionInfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
     GetVersionEx(&VersionInfo);
-    if (VersionInfo.dwMajorVersion <= minVersion)
-        return FALSE;
-    return TRUE;
+    return VersionInfo.dwMajorVersion;
 }
 
 // typedef int (* pMasterVolFunc)(unsigned int flags, float *volume, BOOL *mute);
@@ -265,6 +268,7 @@ int __cdecl mainCRTStartup() {
     BOOL mute = FALSE;
     int argc;
     wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    ULONG version = getMajorVersion();
 
     // arguments parsing
     for (int i = 1; i < argc; i++) {
@@ -274,12 +278,12 @@ int __cdecl mainCRTStartup() {
                 switch (argv[i][j]) {
                 case '-':
                     if (argLen == 6 && _wcsicmp(argv[i], L"--help") == 0) {
-                        PRINT_HELP
+                        PRINT_HELP(version);
                     }
                     break;
                 case 'h':
                 case '?':
-                    PRINT_HELP
+                    PRINT_HELP(version);
                     break;
                 case 's':
                     flags |= MASTERVOL_SILENT;
@@ -333,15 +337,15 @@ int __cdecl mainCRTStartup() {
         }
     }
     if (flags & MASTERVOL_SILENT) {
-        flags &= ~(MASTERVOL_GET_VOL|MASTERVOL_GET_MUTE);
+        flags &= ~(MASTERVOL_GET_VOL | MASTERVOL_GET_MUTE);
     }
-    if (!checkVersion(5)) {
+    if (version < 6) {
         errorCode = masterVolMixer(flags, &volume, &mute);
     } else {
         errorCode = masterVolEndpoint(flags, &volume, &mute);
     }
     if (!(flags & MASTERVOL_SILENT)) {
-        printf("%d\n", (int) lroundf(volume * 100));
+        printf("%d\n", (int)lroundf(volume * 100));
         if (flags & MASTERVOL_GET_MUTE) {
             printf(mute ? "Muted\n" : "Not Muted\n");
         }
