@@ -106,6 +106,8 @@ BOOL checkVersion(unsigned int minVersion) {
     return TRUE;
 }
 
+// typedef int (* pMasterVolFunc)(unsigned int flags, float *volume, BOOL *mute);
+
 int masterVolEndpoint(unsigned int flags, float *volume, BOOL *mute) {
     int errorCode = 0;
     IAudioEndpointVolume *pEndptVol = NULL;
@@ -327,11 +329,7 @@ int __cdecl mainCRTStartup() {
         flags &= ~(MASTERVOL_GET_VOL|MASTERVOL_GET_MUTE);
     }
     if (!checkVersion(5)) {
-        if (flags & MASTERVOL_WAVEOUT) {
-            errorCode = masterVolMixer(flags, &volume, &mute);
-        } else {
-            errorCode = masterVolMixer(flags, &volume, &mute);
-        }
+        errorCode = masterVolMixer(flags, &volume, &mute);
     } else {
         errorCode = masterVolEndpoint(flags, &volume, &mute);
     }
