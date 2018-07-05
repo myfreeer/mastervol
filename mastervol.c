@@ -18,6 +18,7 @@
 #define MASTERVOL_CD FLAG(7)
 #define MASTERVOL_MIDI FLAG(8)
 #define MASTERVOL_LINE FLAG(9)
+#define MASTERVOL_MUTE MASTERVOL_SET_MUTE | MASTERVOL_GET_MUTE
 #define MASTERVOL_SWITCHES MASTERVOL_IN | MASTERVOL_WAVEOUT |                  \
     MASTERVOL_CD | MASTERVOL_MIDI | MASTERVOL_LINE
 
@@ -286,20 +287,19 @@ int __cdecl mainCRTStartup() {
                     PRINT_HELP(version);
                     break;
                 case 's':
+                    flags &= ~(MASTERVOL_GET_VOL | MASTERVOL_GET_MUTE);
                     flags |= MASTERVOL_SILENT;
                     break;
                 case 'm':
                     mute = TRUE;
-                    flags |= MASTERVOL_SET_MUTE;
-                    flags |= MASTERVOL_GET_MUTE;
+                    flags |= MASTERVOL_MUTE;
                     break;
                 case 'd':
                     flags |= MASTERVOL_GET_MUTE;
                     break;
                 case 'u':
                     mute = FALSE;
-                    flags |= MASTERVOL_SET_MUTE;
-                    flags |= MASTERVOL_GET_MUTE;
+                    flags |= MASTERVOL_MUTE;
                     break;
                 case 'i':
                     flags &= ~MASTERVOL_SWITCHES;
@@ -328,6 +328,7 @@ int __cdecl mainCRTStartup() {
             flags |= MASTERVOL_SET_VOL;
         }
     }
+
     if (flags & MASTERVOL_SET_VOL) {
         volume = volume / 100.0;
         if (volume > 1.0) {
@@ -336,14 +337,13 @@ int __cdecl mainCRTStartup() {
             volume = 0.0;
         }
     }
-    if (flags & MASTERVOL_SILENT) {
-        flags &= ~(MASTERVOL_GET_VOL | MASTERVOL_GET_MUTE);
-    }
+
     if (version < 6) {
         errorCode = masterVolMixer(flags, &volume, &mute);
     } else {
         errorCode = masterVolEndpoint(flags, &volume, &mute);
     }
+
     if (!(flags & MASTERVOL_SILENT)) {
         printf("%d\n", (int)lroundf(volume * 100));
         if (flags & MASTERVOL_GET_MUTE) {
