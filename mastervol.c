@@ -18,9 +18,9 @@
 #define MASTERVOL_CD FLAG(7)
 #define MASTERVOL_MIDI FLAG(8)
 #define MASTERVOL_LINE FLAG(9)
-#define MASTERVOL_MUTE MASTERVOL_SET_MUTE | MASTERVOL_GET_MUTE
-#define MASTERVOL_SWITCHES MASTERVOL_IN | MASTERVOL_WAVEOUT |                  \
-    MASTERVOL_CD | MASTERVOL_MIDI | MASTERVOL_LINE
+#define MASTERVOL_MUTE ( MASTERVOL_SET_MUTE | MASTERVOL_GET_MUTE )
+#define MASTERVOL_SWITCHES ( MASTERVOL_IN | MASTERVOL_WAVEOUT |                \
+    MASTERVOL_CD | MASTERVOL_MIDI | MASTERVOL_LINE )
 
 #define EXIT_ON_MM_ERROR(mmResult, description)                                \
     if (MMSYSERR_NOERROR != (mmResult)) {                                      \
@@ -29,23 +29,23 @@
         goto ExitMixer;                                                        \
     }
 
-#define MIXER_INIT(mixerStruct)                                                \
-    ZeroMemory(&(mixerStruct), sizeof(mixerStruct));                           \
-    (mixerStruct).cbStruct = sizeof(mixerStruct);
+#define MIXER_INIT(mixerStruct) mixerStruct = {.cbStruct = sizeof(mixerStruct)}
 
 #define MIXER_LI_INIT(mixerLineControls, mixerControl, mixerLine)              \
-    MIXER_INIT(mixerLineControls)                                              \
-    (mixerLineControls).cControls = 1;                                         \
-    (mixerLineControls).cbmxctrl = sizeof(mixerControl);                       \
-    (mixerLineControls).pamxctrl = &(mixerControl);                            \
-    (mixerLineControls).dwLineID = (mixerLine).dwLineID;
+    mixerLineControls = {.cbStruct = sizeof(mixerLineControls),                \
+                         .cControls = 1,                                       \
+                         .cbmxctrl = sizeof(mixerControl),                     \
+                         .pamxctrl = &(mixerControl),                          \
+                         .dwLineID = (mixerLine).dwLineID}
 
 #define MIXER_DT_INIT(mixerControlDetails, mixerControl, paStruct)             \
-    MIXER_INIT(mixerControlDetails)                                            \
-    (mixerControlDetails).cbDetails = sizeof(paStruct);                        \
-    (mixerControlDetails).dwControlID = (mixerControl).dwControlID;            \
-    (mixerControlDetails).paDetails = &(paStruct);                             \
-    (mixerControlDetails).cChannels = 1;
+    mixerControlDetails = {                                                    \
+        .cbStruct = sizeof(mixerControlDetails),                               \
+        .cbDetails = sizeof(paStruct),                                         \
+        .dwControlID = (mixerControl).dwControlID,                             \
+        .paDetails = &(paStruct),                                              \
+        .cChannels = 1,                                                        \
+    }
 
 #define COM_CALL(hr, pointer, function, ...)                                   \
     hr = (pointer)->lpVtbl->function((pointer), ##__VA_ARGS__);                \
@@ -163,19 +163,13 @@ int masterVolMixer(unsigned int flags, float *volume, BOOL *mute) {
     int errorCode = 0;
     MMRESULT mmResult = MMSYSERR_NOERROR;
     HMIXER hMixer;
-    MIXERCONTROL mixerControl;
-    MIXERLINE mixerLine;
-    MIXERLINECONTROLS mixerLineControls;
-    MIXERCONTROLDETAILS mixerControlDetails;
-    MIXERCONTROLDETAILS_UNSIGNED volStruct;
-    MIXERCONTROLDETAILS_BOOLEAN muteStruct;
 
     // open default mixer
     mmResult = mixerOpen(&hMixer, 0, 0, 0, 0);
     EXIT_ON_MM_ERROR(mmResult, mixerOpen)
 
     // get mixer line info
-    MIXER_INIT(mixerLine)
+    MIXERLINE MIXER_INIT(mixerLine);
     // dwComponentType
     DWORD dwComponentType = MIXERLINE_COMPONENTTYPE_DST_SPEAKERS;
     if (flags & MASTERVOL_IN) {
@@ -204,8 +198,8 @@ int masterVolMixer(unsigned int flags, float *volume, BOOL *mute) {
     EXIT_ON_MM_ERROR(mmResult, mixerGetLineInfo)
 
     // Mixer Line Controls
-    MIXER_INIT(mixerControl)
-    MIXER_LI_INIT(mixerLineControls, mixerControl, mixerLine)
+    MIXERCONTROL MIXER_INIT(mixerControl);
+    MIXERLINECONTROLS MIXER_LI_INIT(mixerLineControls, mixerControl, mixerLine);
 
     mixerLineControls.dwControlType = MIXERCONTROL_CONTROLTYPE_VOLUME;
     mmResult = mixerGetLineControls((HMIXEROBJ)hMixer, &mixerLineControls,
@@ -213,7 +207,8 @@ int masterVolMixer(unsigned int flags, float *volume, BOOL *mute) {
     EXIT_ON_MM_ERROR(mmResult, mixerGetLineControls)
 
     // volume mixer control details
-    MIXER_DT_INIT(mixerControlDetails, mixerControl, volStruct)
+    MIXERCONTROLDETAILS_UNSIGNED volStruct = {0};
+    MIXERCONTROLDETAILS MIXER_DT_INIT(mixerControlDetails, mixerControl, volStruct);
 
     const DWORD maxVol = mixerControl.Bounds.lMaximum;
     const DWORD minVol = mixerControl.Bounds.lMinimum;
@@ -231,7 +226,8 @@ int masterVolMixer(unsigned int flags, float *volume, BOOL *mute) {
         *volume = ((double)volStruct.dwValue + minVol) / (maxVol - minVol);
     }
 
-    if (flags & (MASTERVOL_SET_MUTE | MASTERVOL_GET_MUTE)) {
+    MIXERCONTROLDETAILS_BOOLEAN muteStruct = {0};
+    if (flags & MASTERVOL_MUTE) {
         // Mixer Line Controls Mute
         mixerLineControls.dwControlType = MIXERCONTROL_CONTROLTYPE_MUTE;
         mmResult = mixerGetLineControls((HMIXEROBJ)hMixer, &mixerLineControls,
@@ -239,7 +235,8 @@ int masterVolMixer(unsigned int flags, float *volume, BOOL *mute) {
         EXIT_ON_MM_ERROR(mmResult, mixerGetLineControls)
 
         // mute mixer control details
-        MIXER_DT_INIT(mixerControlDetails, mixerControl, muteStruct)
+        mixerControlDetails.cbDetails = sizeof(muteStruct);
+        mixerControlDetails.paDetails = &muteStruct;
     }
     if (flags & MASTERVOL_SET_MUTE) {
         // change mute status
