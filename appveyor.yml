@@ -23,3 +23,8 @@ artifacts:
 on_failure:
 - appveyor PushArtifact mastervol_x64.exe
 - appveyor PushArtifact mastervol_x86.exe
+skip_commits:
+  files:
+    - 'LICENSE'
+    - '*.md'
+    - '.gitingore'
