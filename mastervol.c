@@ -103,11 +103,9 @@ void printHelp(ULONG version) {
     }
 }
 ULONG getMajorVersion(void) {
-    OSVERSIONINFO VersionInfo;
-    ZeroMemory(&VersionInfo, sizeof(OSVERSIONINFO));
-    VersionInfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-    GetVersionEx(&VersionInfo);
-    return VersionInfo.dwMajorVersion;
+    OSVERSIONINFO versionInfo = {.dwOSVersionInfoSize = sizeof(OSVERSIONINFO)};
+    GetVersionEx(&versionInfo);
+    return versionInfo.dwMajorVersion;
 }
 
 // typedef int (* pMasterVolFunc)(unsigned int flags, float *volume, BOOL *mute);
@@ -190,8 +188,8 @@ int masterVolMixer(unsigned int flags, float *volume, BOOL *mute) {
 
     // workaround
     if (mmResult == MIXERR_INVALCONTROL &&
-        dwComponentType == MIXERLINE_COMPONENTTYPE_DST_WAVEIN) {
-        mixerLine.dwComponentType = dwComponentType;
+        dwComponentType == MIXERLINE_COMPONENTTYPE_SRC_MICROPHONE) {
+        mixerLine.dwComponentType = MIXERLINE_COMPONENTTYPE_DST_WAVEIN;
         mmResult = mixerGetLineInfo((HMIXEROBJ)hMixer, &mixerLine,
                                     MIXER_GETLINEINFOF_COMPONENTTYPE);
     }
