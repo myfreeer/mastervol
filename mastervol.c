@@ -135,17 +135,17 @@ int masterVolEndpoint(unsigned int flags, float *volume, BOOL *mute) {
     COM_CALL(hResult, pDevice, Activate, &IID_IAudioEndpointVolume, CLSCTX_ALL,
              NULL, (void **)&pEndptVol);
 
-    if (flags & MASTERVOL_SET_VOL) {
+    if (flags & MASTERVOL_SET_VOL && volume) {
         COM_CALL(hResult, pEndptVol, SetMasterVolumeLevelScalar, *volume,
                  NULL);
     }
-    if (flags & MASTERVOL_SET_MUTE) {
+    if (flags & MASTERVOL_SET_MUTE && mute) {
         COM_CALL(hResult, pEndptVol, SetMute, *mute, NULL);
     }
-    if (flags & MASTERVOL_GET_VOL) {
+    if (flags & MASTERVOL_GET_VOL && volume) {
         COM_CALL(hResult, pEndptVol, GetMasterVolumeLevelScalar, volume);
     }
-    if (flags & MASTERVOL_GET_MUTE) {
+    if (flags & MASTERVOL_GET_MUTE && mute) {
         COM_CALL(hResult, pEndptVol, GetMute, mute);
     }
 
@@ -210,14 +210,14 @@ int masterVolMixer(unsigned int flags, float *volume, BOOL *mute) {
 
     const DWORD maxVol = mixerControl.Bounds.lMaximum;
     const DWORD minVol = mixerControl.Bounds.lMinimum;
-    if (flags & MASTERVOL_SET_VOL) {
+    if (flags & MASTERVOL_SET_VOL && volume) {
         volStruct.dwValue = ((maxVol - minVol) * (*volume)) + minVol;
         mmResult = mixerSetControlDetails((HMIXEROBJ)hMixer, &mixerControlDetails,
                                    MIXER_SETCONTROLDETAILSF_VALUE);
         EXIT_ON_MM_ERROR(mmResult, mixerSetControlDetails)
     }
     // get master volume
-    if (flags & MASTERVOL_GET_VOL) {
+    if (flags & MASTERVOL_GET_VOL && volume) {
         mmResult = mixerGetControlDetails((HMIXEROBJ)hMixer, &mixerControlDetails,
                                           MIXER_GETCONTROLDETAILSF_VALUE);
         EXIT_ON_MM_ERROR(mmResult, mixerGetControlDetails)
@@ -236,7 +236,7 @@ int masterVolMixer(unsigned int flags, float *volume, BOOL *mute) {
         mixerControlDetails.cbDetails = sizeof(muteStruct);
         mixerControlDetails.paDetails = &muteStruct;
     }
-    if (flags & MASTERVOL_SET_MUTE) {
+    if (flags & MASTERVOL_SET_MUTE && mute) {
         // change mute status
         muteStruct.fValue = *mute;
         mmResult =
@@ -244,7 +244,7 @@ int masterVolMixer(unsigned int flags, float *volume, BOOL *mute) {
                                    MIXER_SETCONTROLDETAILSF_VALUE);
         EXIT_ON_MM_ERROR(mmResult, mixerSetControlDetails)
     }
-    if (flags & MASTERVOL_GET_MUTE) {
+    if (flags & MASTERVOL_GET_MUTE && mute) {
         // get mute status
         mmResult =
             mixerGetControlDetails((HMIXEROBJ)hMixer, &mixerControlDetails,
