@@ -78,8 +78,9 @@
     "-w Set/get Wave Out status (win xp)\n"                                    \
     "-c Set/get CD status (win xp)\n"                                          \
     "-n Set/get Midi status (win xp)\n"                                        \
-    "-l Set/get Line in status (win xp)\n"                                     \
-    "volume: float in 0 to 100\n"
+    "-l Set/get Line in status (win xp)\n"
+
+#define HELP_TEXT_SUFFIX "\nvolume: float in 0 to 100\n"
 
 #define PRINT_HELP(version)                                                    \
     {                                                                          \
@@ -101,7 +102,9 @@ void printHelp(ULONG version) {
     if (version < 6) {
         puts(HELP_TEXT_XP);
     }
+    puts(HELP_TEXT_SUFFIX);
 }
+
 ULONG getMajorVersion(void) {
     OSVERSIONINFO versionInfo = {.dwOSVersionInfoSize = sizeof(OSVERSIONINFO)};
     GetVersionEx(&versionInfo);
@@ -344,7 +347,7 @@ int __cdecl mainCRTStartup() {
     if (!(flags & MASTERVOL_SILENT)) {
         printf("%d\n", (int)lroundf(volume * 100));
         if (flags & MASTERVOL_GET_MUTE) {
-            printf(mute ? "Muted\n" : "Not Muted\n");
+            puts(mute ? "Muted\n" : "Not Muted\n");
         }
     }
 
